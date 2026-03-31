@@ -7,10 +7,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
+from pydantic_core import PydanticUndefined
 
 from ore.config import AgentConfig
 from ore.llm.provider import LLMProvider
 from ore.research_objects import ResearchObject
+from ore.tools.search import SEARCH_TOOL_SCHEMA, WebSearchTool
 
 if TYPE_CHECKING:
     from ore.memory.store import MemoryStore
@@ -25,14 +27,22 @@ class BaseAgent:
 
     Each agent has a role name, a system prompt loaded from a text file,
     a set of allowed output types, and access to the shared LLM provider.
+    Optionally has web search access for evidence-based research.
     """
 
     role: str = "base"
     output_types: list[type[BaseModel]] = []
+    can_search: bool = False
 
-    def __init__(self, config: AgentConfig, llm: LLMProvider) -> None:
+    def __init__(
+        self,
+        config: AgentConfig,
+        llm: LLMProvider,
+        search_tool: WebSearchTool | None = None,
+    ) -> None:
         self.config = config
         self.llm = llm
+        self.search_tool = search_tool
         self._system_prompt: str | None = None
 
     @property
@@ -83,6 +93,12 @@ class BaseAgent:
         if extra_context:
             user_prompt += f"\n\n{extra_context}"
 
+        tools = None
+        tool_executor = None
+        if self.can_search and self.search_tool and self.search_tool.available:
+            tools = [SEARCH_TOOL_SCHEMA]
+            tool_executor = self.search_tool.execute_tool_call
+
         raw = self.llm.complete(
             model=self.config.model,
             system_prompt=self.system_prompt,
@@ -91,13 +107,17 @@ class BaseAgent:
             temperature=self.config.temperature,
             max_tokens=self.config.max_tokens,
             round_number=round_number,
+            tools=tools,
+            tool_executor=tool_executor,
         )
 
         try:
             result = self.llm.parse_structured_output(raw, self.output_types)
         except Exception as e:
-            logger.warning("Failed to parse structured output from %s: %s", self.role, e)
-            logger.debug("Raw output: %s", raw)
+            logger.warning(
+                "Failed to parse structured output from %s: %s", self.role, e
+            )
+            logger.warning("Raw output (first 500 chars): %.500s", raw)
             fallback_cls = self.output_types[0]
             result = self._fallback_parse(raw, fallback_cls)
 
@@ -108,11 +128,31 @@ class BaseAgent:
         return result
 
     def _fallback_parse(self, raw: str, cls: type[BaseModel]) -> ResearchObject:
-        """Last-resort parse: stuff the raw text into the first string field."""
+        """Last-resort parse: fill required fields with raw text or defaults."""
+        if not raw.strip():
+            raw = (
+                "[Empty or unparseable model response — possible refusal, "
+                "rate limit, or tool/JSON formatting bug]"
+            )
         fields = cls.model_fields
         data: dict = {"object_type": cls.__name__.lower(), "created_by": self.role}
         for name, info in fields.items():
-            if info.annotation is str:
+            has_default = (
+                info.default is not PydanticUndefined or info.default_factory
+            )
+            if name in data or has_default:
+                continue
+            anno = info.annotation
+            if anno is str:
                 data[name] = raw
-                break
+            elif anno is float:
+                data[name] = 0.5
+            elif anno is int:
+                data[name] = 0
+            elif str(anno).startswith("list"):
+                data[name] = []
+            elif str(anno).startswith("typing.Literal"):
+                args = getattr(anno, "__args__", None)
+                if args:
+                    data[name] = args[0]
         return cls.model_validate(data)

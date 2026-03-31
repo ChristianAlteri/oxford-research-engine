@@ -2,13 +2,45 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Protocol
 
 from ore.research_objects import ResearchObject, RoundScore, deserialize_research_object
+
+STOPWORDS = {
+    "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for", "of",
+    "with", "by", "from", "is", "are", "was", "were", "be", "been", "being",
+    "have", "has", "had", "do", "does", "did", "will", "would", "could", "should",
+    "may", "might", "can", "shall", "it", "its", "this", "that", "these", "those",
+    "what", "which", "who", "whom", "how", "when", "where", "why", "if", "than",
+    "we", "our", "you", "your", "i", "my", "me", "he", "she", "they", "them",
+    "between", "toward", "towards", "into", "about", "through", "during", "before",
+    "after", "above", "below", "specific", "particular", "whether", "while",
+    "also", "just", "like", "look", "explore", "consider", "understand",
+}
+
+
+def generate_session_slug(question: str, max_words: int = 4) -> str:
+    """Generate a human-readable session slug from a research question.
+
+    Examples:
+        "What resolves QM and GR?" -> "resolves-qm-gr-a3f2"
+        "How should Storage convert this user?" -> "storage-convert-user-8b1c"
+    """
+    clean = re.sub(r"[^a-zA-Z0-9\s]", "", question.lower())
+    words = [w for w in clean.split() if w not in STOPWORDS and len(w) > 1]
+    slug_words = words[:max_words]
+
+    if not slug_words:
+        slug_words = ["session"]
+
+    short_hash = hashlib.sha256(question.encode()).hexdigest()[:4]
+    return "-".join(slug_words) + "-" + short_hash
 
 
 class MemoryStore(Protocol):
@@ -31,12 +63,23 @@ DEFAULT_SESSIONS_DIR = Path.home() / ".ore" / "sessions"
 class JsonMemoryStore:
     """JSON file-backed memory store. Each session gets its own directory."""
 
-    def __init__(self, session_id: str | None = None, sessions_dir: Path | None = None) -> None:
-        self.session_id = session_id or uuid.uuid4().hex[:8]
+    def __init__(
+        self,
+        session_id: str | None = None,
+        sessions_dir: Path | None = None,
+        question: str | None = None,
+    ) -> None:
+        if session_id:
+            self.session_id = session_id
+        elif question:
+            self.session_id = generate_session_slug(question)
+        else:
+            self.session_id = uuid.uuid4().hex[:8]
         self.sessions_dir = sessions_dir or DEFAULT_SESSIONS_DIR
         self.session_dir = self.sessions_dir / self.session_id
         self._objects: list[ResearchObject] = []
         self._index: dict[str, ResearchObject] = {}
+        self._hitl_entries: list[dict] = []
 
     @property
     def memory_file(self) -> Path:
@@ -48,6 +91,27 @@ class JsonMemoryStore:
     def add(self, obj: ResearchObject) -> None:
         self._objects.append(obj)
         self._index[obj.id] = obj
+
+    def record_hitl(
+        self,
+        *,
+        object_id: str,
+        object_type: str,
+        round_number: int,
+        phase: str,
+        flags: list[str],
+    ) -> None:
+        """Append a rule-based human-review flag record (audit trail)."""
+        self._hitl_entries.append({
+            "object_id": object_id,
+            "object_type": object_type,
+            "round_number": round_number,
+            "phase": phase,
+            "flags": flags,
+        })
+
+    def get_hitl_entries(self) -> list[dict]:
+        return list(self._hitl_entries)
 
     def get_all(self) -> list[ResearchObject]:
         return list(self._objects)
@@ -71,6 +135,8 @@ class JsonMemoryStore:
         self.ensure_dir()
         data = [obj.model_dump(mode="json") for obj in self._objects]
         self.memory_file.write_text(json.dumps(data, indent=2, default=str))
+        hitl_path = self.session_dir / "hitl_review.json"
+        hitl_path.write_text(json.dumps(self._hitl_entries, indent=2))
 
     def save_round(self, round_number: int) -> None:
         """Save a snapshot of a single round's objects."""
@@ -86,6 +152,11 @@ class JsonMemoryStore:
         raw = json.loads(self.memory_file.read_text())
         self._objects = [deserialize_research_object(item) for item in raw]
         self._index = {obj.id: obj for obj in self._objects}
+        hitl_path = self.session_dir / "hitl_review.json"
+        if hitl_path.exists():
+            self._hitl_entries = json.loads(hitl_path.read_text())
+        else:
+            self._hitl_entries = []
 
     def save_config(self, config_data: dict) -> None:
         """Persist the session configuration alongside memory."""

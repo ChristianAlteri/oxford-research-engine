@@ -22,9 +22,12 @@ class EngineConfig(BaseModel):
     question: str = ""
     max_rounds: int = 10
     budget_usd: float = 10.0
+    # Rule-based human-in-the-loop hints (no model self-confidence)
+    hitl: bool = True
+    hitl_pause: bool = False
 
     agents: dict[str, AgentConfig] = Field(default_factory=lambda: {
-        "builder": AgentConfig(model="anthropic/claude-sonnet-4-20250514", temperature=0.8),
+        "builder": AgentConfig(model="anthropic/claude-sonnet-4-20250514", temperature=0.65),
         "skeptic": AgentConfig(model="anthropic/claude-sonnet-4-20250514", temperature=0.3),
         "historian": AgentConfig(model="anthropic/claude-sonnet-4-20250514", temperature=0.5),
         "referee": AgentConfig(model="anthropic/claude-sonnet-4-20250514", temperature=0.1),

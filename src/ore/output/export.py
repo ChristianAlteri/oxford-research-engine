@@ -30,6 +30,7 @@ class MarkdownExporter:
         question: str,
         session_id: str,
         cost_summary: dict | None = None,
+        hitl_entries: list[dict] | None = None,
     ) -> str:
         lines = [
             "# ORE Research Report",
@@ -46,6 +47,21 @@ class MarkdownExporter:
                 f"**Estimated cost**: ${cost_summary.get('total_cost_usd', 0):.4f}  ",
                 "",
             ])
+
+        if hitl_entries:
+            lines.extend([
+                "## Suggested human review (rule-based)",
+                "",
+                "*Heuristic flags only — not model self-confidence. Review before citing.*",
+                "",
+            ])
+            for e in hitl_entries:
+                fl = ", ".join(e.get("flags", []))
+                lines.append(
+                    f"- **Round {e.get('round_number', '?')}** · `{e.get('object_id', '')}` "
+                    f"({e.get('phase', '')}): {fl}"
+                )
+            lines.append("")
 
         lines.append("---\n")
 
@@ -105,31 +121,49 @@ class MarkdownExporter:
 
         if isinstance(obj, Conjecture):
             conf_bar = "█" * int(obj.confidence * 10) + "░" * (10 - int(obj.confidence * 10))
+            src = ""
+            if obj.sources:
+                src = "\n\n**Sources** (credibility 0–1):\n" + "\n".join(
+                    f"- [{s.credibility:.2f}] {s.reference}" for s in obj.sources
+                )
             return (
                 f"{header}"
                 f"**Claim**: {obj.claim}\n\n"
                 f"{obj.reasoning}\n\n"
                 f"Confidence: [{conf_bar}] {obj.confidence:.0%}"
+                f"{src}"
             )
 
         if isinstance(obj, ToyModel):
             assumptions = "\n".join(f"  - {a}" for a in obj.assumptions)
             predictions = "\n".join(f"  - {p}" for p in obj.predictions)
             limitations = "\n".join(f"  - {lim}" for lim in obj.limitations)
+            src = ""
+            if obj.sources:
+                src = "\n\n**Sources** (credibility 0–1):\n" + "\n".join(
+                    f"- [{s.credibility:.2f}] {s.reference}" for s in obj.sources
+                )
             return (
                 f"{header}"
                 f"{obj.description}\n\n"
                 f"**Assumptions**:\n{assumptions}\n\n"
                 f"**Predictions**:\n{predictions}\n\n"
                 f"**Limitations**:\n{limitations}"
+                f"{src}"
             )
 
         if isinstance(obj, Reframe):
+            src = ""
+            if obj.sources:
+                src = "\n\n**Sources** (credibility 0–1):\n" + "\n".join(
+                    f"- [{s.credibility:.2f}] {s.reference}" for s in obj.sources
+                )
             return (
                 f"{header}"
                 f"**From**: {obj.original_framing}\n\n"
                 f"**To**: {obj.new_framing}\n\n"
                 f"{obj.justification}"
+                f"{src}"
             )
 
         if isinstance(obj, Objection):
@@ -193,8 +227,9 @@ class MarkdownExporter:
         question: str,
         session_id: str,
         cost_summary: dict | None = None,
+        hitl_entries: list[dict] | None = None,
     ) -> None:
-        md = self.export(objects, question, session_id, cost_summary)
+        md = self.export(objects, question, session_id, cost_summary, hitl_entries)
         path.write_text(md)
 
 
@@ -207,12 +242,14 @@ class JsonExporter:
         question: str,
         session_id: str,
         cost_summary: dict | None = None,
+        hitl_entries: list[dict] | None = None,
     ) -> str:
         data = {
             "session_id": session_id,
             "question": question,
             "generated_at": datetime.now(timezone.utc).isoformat(),
             "cost": cost_summary,
+            "hitl_review": hitl_entries or [],
             "objects": [obj.model_dump(mode="json") for obj in objects],
         }
         return json.dumps(data, indent=2, default=str)
@@ -224,5 +261,6 @@ class JsonExporter:
         question: str,
         session_id: str,
         cost_summary: dict | None = None,
+        hitl_entries: list[dict] | None = None,
     ) -> None:
-        path.write_text(self.export(objects, question, session_id, cost_summary))
+        path.write_text(self.export(objects, question, session_id, cost_summary, hitl_entries))

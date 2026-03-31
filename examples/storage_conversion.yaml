@@ -1,0 +1,47 @@
+question: >
+  CONTEXT: Storage is a curated vintage/archive fashion marketplace operated by Starflo.
+  Revenue model: 5-8% transaction commission on sales. Boards (Pinterest-style save lists)
+  launched March 24, 2026. The marketplace has 20+ cities of sellers globally.
+  Monetization is commission-based — we only make money when users BUY.
+
+  SIGNAL: A new user "lilayanow" joined today (March 30, 2026) with this behavior:
+  - 0 orders, £0 spent, £0 LTV
+  - 12 activities — ALL are Board Saves (zero likes, zero clicks, zero cart adds)
+  - Created a board called "guh"
+  - Saved items from 3 different stores (hdkk., FREESTYLER DRYRISER, shop nope)
+  - Items saved: Miu Miu 00s Neoprene Bag, Vivienne Westwood Red Label F/W 2007 pieces,
+    2000s Vivienne Westwood ruched skirt, Dolce & Gabbana Bondage Corset,
+    Miu Miu FW 1999 Neoprene Ruffle Two Piece
+  - Has 1 sourcing request submitted
+  - Follows 0 stores, follows 0 sellers
+  - Interacted with 3 stores but spent £0
+
+  TASTE PROFILE: Late 90s / early 2000s archive. Miu Miu-heavy. Vivienne Westwood.
+  High-fashion archive with an edge (bondage corset, neoprene). This is not a casual browser.
+
+  QUESTION: How should Storage (the marketplace) convert this specific user signal into
+  a first purchase? What automated and manual interventions could maximize conversion?
+  Consider: timing, messaging, incentives, seller-side actions, product recommendations,
+  the sourcing request, and the board behavior as a taste signal. What is the optimal
+  conversion playbook for a high-intent, zero-purchase board curator?
+
+max_rounds: 5
+budget_usd: 3.00
+
+agents:
+  builder:
+    model: "anthropic/claude-sonnet-4-20250514"
+    temperature: 0.8
+    max_tokens: 4096
+  skeptic:
+    model: "anthropic/claude-sonnet-4-20250514"
+    temperature: 0.3
+    max_tokens: 4096
+  historian:
+    model: "anthropic/claude-sonnet-4-20250514"
+    temperature: 0.5
+    max_tokens: 3000
+  referee:
+    model: "anthropic/claude-sonnet-4-20250514"
+    temperature: 0.1
+    max_tokens: 2000

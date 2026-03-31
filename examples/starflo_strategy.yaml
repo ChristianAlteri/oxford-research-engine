@@ -1,0 +1,108 @@
+question: >
+  You are advising Christian Alteri, CTO and co-founder of Starflo, on business
+  strategy, community moat, and technology moat. Be direct, critical, and
+  specific. Here is the full context:
+
+  === COMPANY ===
+  Starflo is a bootstrapped SaaS company at the intersection of culture,
+  technology, and fashion. Co-founded by Christian (technology) and Stella
+  Brackenridge (CEO — curation, community, growth). Tagline: "Shopify for
+  circular fashion resale." Legal entity: Starflo Ltd, England & Wales.
+
+  === WAR DOCTRINE ===
+  Enemy: LVMH, Kering, Richemont — conglomerates that acquire brands, strip
+  their soul, and replace craft with margin. Platforms that bury independents
+  and take 40% for nothing. Army: Independent sellers, vintage curators, market
+  organisers, small retailers — the people who actually create fashion culture.
+  Active in 20+ cities globally. Starflo exists to arm them with infrastructure.
+  "We don't sell software. We build weapons for small businesses."
+
+  === THREE PRODUCTS ===
+
+  1. MARKETMATE (B2B SaaS for market/event organizers)
+  - List events, sell stalls to vendors, sell tickets, manage operations
+  - First paying customer: Second Life Markets (£1,000 anchor contract)
+  - Dynamic application forms, seating maps, Stripe payments
+  - Event types: MARKET, RUNWAY
+  - Next big event: ThriftCon x Second Life at Drumsheds, May 2026
+  - Tech: Next.js 15, CockroachDB, Clerk auth, Stripe (company-owned keys)
+  - Pricing: Core £49/mo, Pro £99/mo
+
+  2. STORAGE POS (B2B SaaS for vintage/consignment retail stores)
+  - Multi-vendor stock management, consignment automation, instant seller payouts
+  - Staff KPI tracking, rental management, sourcing requests
+  - Shopify OAuth sync, Xero accounting integration
+  - Stripe Connect for per-seller payouts
+  - Tech: Next.js, CockroachDB, Prisma 5.x, Clerk auth
+  - Pricing: Core £49/mo, Pro £99/mo (Pro includes Rental Enforcer late-fee automation)
+
+  3. STORAGE MARKETPLACE (B2C curated resale marketplace, trades as "Storage")
+  - Consumer-facing marketplace for vintage/archive fashion
+  - Curated — not a volume play like Depop/Vinted. Trust > volume.
+  - 20+ cities: London, Manchester, Brussels, Berlin, Stockholm, Athens, Milan,
+    Paris, New York, Sydney, Melbourne, Bangkok, Hong Kong, etc.
+  - Google Shopping + Meta product feeds, GA4 + Meta Pixel tracking
+  - Editorial features: curations, collections, our-picks, trending
+  - Boards (Pinterest-style saves) launched March 24, 2026
+  - Sourcing requests for hard-to-find pieces
+  - Commission model: 5-8% (vs competitors at 15-25%)
+  - Tech: Next.js, Chakra/Material/Headless/Radix UI (multiple UI libs), Clerk
+
+  === REVENUE TARGETS (24-month) ===
+  Target: £2M+ ARR
+  - 500 market organizers × £200/mo = £1.2M
+  - 200 vintage stores × £150/mo = £360K
+  - 5% take on £10M Storage GMV = £500K
+
+  === COMPETITIVE POSITIONING ===
+  - vs Eventbrite: no vendor workflow
+  - vs Depop/Vinted: volume not curation
+  - vs Shopify/Square: not built for consignment
+  - vs Hurr/By Rotation: cheaper (5-8% vs 15-25%), stores keep customer ownership
+  - Moat: Cultural layer. Infrastructure + curation = trust that volume-first
+    platforms can't replicate.
+
+  === UPCOMING INITIATIVES ===
+  - WhatsApp Seller Agent (Project Claw): AI agent that lets sellers upload
+    inventory by sending photos via WhatsApp. Vision model identifies garments.
+  - Boards Phase 2: Taste profiling from board saves → personal stylist agent,
+    "your taste match just listed" notifications, seller intelligence dashboards
+  - Expansion: London (proven) → New York (US entry) → Paris, Tokyo, Berlin
+
+  === KNOWN TECH DEBT ===
+  - stella-starfetch has 4+ UI component libraries (Chakra, Material, Headless, Radix)
+  - Build requires --max-old-space-size=4096 (large bundle)
+  - Prisma version gap: stella-admin 5.16.1 vs market-mate 6.7.0
+  - Clerk version gap: stella-starfetch 6.31.9 vs stella-admin 5.0.0-beta.35
+  - stella-starfetch reads from stella-admin DB (no own Prisma deploy)
+
+  === QUESTION ===
+  As a strategic advisor to Christian the CEO: What should Starflo do better?
+  Analyze the business strategy, community moat, technology moat, product
+  priorities, and competitive positioning. Where are the blind spots? What is
+  the biggest risk to the 24-month revenue target? What should Christian
+  prioritize as the sole technical founder? Where is the community moat
+  strongest and weakest? Is the three-product strategy sustainable for a
+  bootstrapped two-person founding team? What would you cut, double down on,
+  or change?
+
+max_rounds: 6
+budget_usd: 5.00
+
+agents:
+  builder:
+    model: "anthropic/claude-sonnet-4-20250514"
+    temperature: 0.8
+    max_tokens: 4096
+  skeptic:
+    model: "anthropic/claude-sonnet-4-20250514"
+    temperature: 0.2
+    max_tokens: 4096
+  historian:
+    model: "anthropic/claude-sonnet-4-20250514"
+    temperature: 0.5
+    max_tokens: 4096
+  referee:
+    model: "anthropic/claude-sonnet-4-20250514"
+    temperature: 0.1
+    max_tokens: 2000

@@ -77,6 +77,15 @@ class TerminalRenderer:
         self.console.print(panel)
         self.console.print()
 
+    def print_hitl_flags(
+        self, obj: ResearchObject, phase: str, flags: list[str]
+    ) -> None:
+        """Rule-based human-review hint (not model confidence)."""
+        fl = ", ".join(flags)
+        self.console.print(
+            f"[yellow]⚠ HITL[/yellow] [dim]{phase}[/dim] `{obj.id}` → [bold]{fl}[/bold]"
+        )
+
     def print_round_score(self, score: RoundScore) -> None:
         table = Table(show_header=True, header_style="bold green", expand=True)
         table.add_column("Metric", style="dim")
@@ -132,7 +141,16 @@ class TerminalRenderer:
     def _render_content(self, obj: ResearchObject) -> str:
         if isinstance(obj, Conjecture):
             conf = f"{obj.confidence:.0%}"
-            return f"[bold]Claim:[/bold] {obj.claim}\n\n{obj.reasoning}\n\nConfidence: {conf}"
+            src = ""
+            if obj.sources:
+                src = "\n\n[dim]Sources (0–1):[/dim]\n" + "\n".join(
+                    f"  [dim][{s.credibility:.2f}] {s.reference}[/dim]"
+                    for s in obj.sources
+                )
+            return (
+                f"[bold]Claim:[/bold] {obj.claim}\n\n{obj.reasoning}\n\n"
+                f"Confidence: {conf}{src}"
+            )
 
         if isinstance(obj, ToyModel):
             parts = [obj.description, "\n[bold]Assumptions:[/bold]"]
@@ -141,13 +159,25 @@ class TerminalRenderer:
             parts.extend(f"  • {p}" for p in obj.predictions)
             parts.append("\n[bold]Limitations:[/bold]")
             parts.extend(f"  • {lim}" for lim in obj.limitations)
+            if obj.sources:
+                parts.append("\n[dim]Sources (0–1):[/dim]")
+                parts.extend(
+                    f"  [dim][{s.credibility:.2f}] {s.reference}[/dim]"
+                    for s in obj.sources
+                )
             return "\n".join(parts)
 
         if isinstance(obj, Reframe):
+            src = ""
+            if obj.sources:
+                src = "\n\n[dim]Sources (0–1):[/dim]\n" + "\n".join(
+                    f"  [dim][{s.credibility:.2f}] {s.reference}[/dim]"
+                    for s in obj.sources
+                )
             return (
                 f"[bold]From:[/bold] {obj.original_framing}\n\n"
                 f"[bold]To:[/bold] {obj.new_framing}\n\n"
-                f"{obj.justification}"
+                f"{obj.justification}{src}"
             )
 
         if isinstance(obj, Objection):

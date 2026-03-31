@@ -7,6 +7,9 @@ import sys
 from pathlib import Path
 
 import click
+from dotenv import load_dotenv
+
+load_dotenv()
 from rich.console import Console
 from rich.table import Table
 
@@ -16,6 +19,7 @@ from ore.llm.provider import LLMProvider
 from ore.memory.store import JsonMemoryStore
 from ore.output.export import JsonExporter, MarkdownExporter
 from ore.output.terminal import TerminalRenderer
+from ore.tools.search import WebSearchTool
 
 console = Console()
 renderer = TerminalRenderer(console)
@@ -48,6 +52,21 @@ def cli(verbose: bool) -> None:
     default="markdown",
     help="Export format for the report.",
 )
+@click.option(
+    "--delay", "-d", type=float, default=12,
+    help="Seconds to wait between agent calls (rate-limit pacing). Default 12.",
+)
+@click.option(
+    "--hitl/--no-hitl",
+    default=True,
+    help="Rule-based human-review flags + hitl_review.json (default: on).",
+)
+@click.option(
+    "--pause",
+    "hitl_pause",
+    is_flag=True,
+    help="Wait for Enter after each full round (human checkpoint).",
+)
 def run(
     question: str | None,
     config_path: str | None,
@@ -55,6 +74,9 @@ def run(
     budget: float | None,
     session_id: str | None,
     export_format: str,
+    delay: float,
+    hitl: bool,
+    hitl_pause: bool,
 ) -> None:
     """Run a research session on a question."""
     if config_path:
@@ -68,17 +90,22 @@ def run(
         config.max_rounds = rounds
     if budget:
         config.budget_usd = budget
+    config.hitl = hitl
+    config.hitl_pause = hitl_pause
 
     if not config.question:
         console.print("[bold red]Error:[/bold red] No question provided.")
         console.print("Usage: ore run \"Your research question here\"")
         sys.exit(1)
 
-    memory = JsonMemoryStore(session_id=session_id)
+    memory = JsonMemoryStore(session_id=session_id, question=config.question)
     memory.ensure_dir()
     memory.save_config(config.model_dump())
 
     llm = LLMProvider()
+
+    search_tool = WebSearchTool()
+    search_enabled = search_tool.available
 
     engine = ResearchEngine(
         config=config,
@@ -88,14 +115,26 @@ def run(
         on_round_start=renderer.print_round_start,
         on_round_end=lambda r, s: renderer.print_round_score(s),
         on_budget_warning=renderer.print_budget_warning,
+        on_hitl_flags=renderer.print_hitl_flags,
+        search_tool=search_tool if search_enabled else None,
+        call_delay=delay,
     )
 
     agent_models = ", ".join(f"{k}={v.model}" for k, v in config.agents.items())
+    search_status = "on" if search_enabled else "off"
+    delay_info = f" | Pacing: {delay:.0f}s" if delay > 0 else ""
+    hitl_info = f" | HITL flags: {'on' if hitl else 'off'}"
+    pause_info = " | Round pause: on" if hitl_pause else ""
     renderer.print_header(
         config.question,
         f"Max rounds: {config.max_rounds} | Budget: ${config.budget_usd:.2f} "
-        f"| Models: {agent_models}",
+        f"| Search: {search_status}{delay_info}{hitl_info}{pause_info} | Models: {agent_models}",
     )
+    if not search_enabled:
+        console.print(
+            "[dim]Tip: Set TAVILY_API_KEY to enable web search "
+            "for Builder and Skeptic agents.[/dim]\n"
+        )
 
     try:
         objects = engine.run()
@@ -117,7 +156,20 @@ def run(
 @click.argument("session_id")
 @click.option("--rounds", "-r", type=int, help="Additional rounds to run.")
 @click.option("--budget", "-b", type=float, help="Additional budget in USD.")
-def resume(session_id: str, rounds: int | None, budget: float | None) -> None:
+@click.option("--hitl/--no-hitl", default=True, help="Rule-based HITL flags (default: on).")
+@click.option(
+    "--pause",
+    "hitl_pause",
+    is_flag=True,
+    help="Wait for Enter after each full round.",
+)
+def resume(
+    session_id: str,
+    rounds: int | None,
+    budget: float | None,
+    hitl: bool,
+    hitl_pause: bool,
+) -> None:
     """Resume a previously stopped research session."""
     memory = JsonMemoryStore(session_id=session_id)
     if not memory.memory_file.exists():
@@ -138,8 +190,12 @@ def resume(session_id: str, rounds: int | None, budget: float | None) -> None:
         config.max_rounds = current_max + rounds
     if budget:
         config.budget_usd = budget
+    config.hitl = hitl
+    config.hitl_pause = hitl_pause
 
     llm = LLMProvider()
+    search_tool = WebSearchTool()
+    search_enabled = search_tool.available
 
     engine = ResearchEngine(
         config=config,
@@ -149,6 +205,9 @@ def resume(session_id: str, rounds: int | None, budget: float | None) -> None:
         on_round_start=renderer.print_round_start,
         on_round_end=lambda r, s: renderer.print_round_score(s),
         on_budget_warning=renderer.print_budget_warning,
+        on_hitl_flags=renderer.print_hitl_flags,
+        search_tool=search_tool if search_enabled else None,
+        call_delay=12,
     )
 
     renderer.print_header(config.question, f"Resuming session {session_id}")
@@ -222,12 +281,16 @@ def export(session_id: str, fmt: str, output_path: str | None) -> None:
     meta = memory.get_session_metadata()
     question = meta.get("question", "Unknown")
 
+    hitl_entries = memory.get_hitl_entries()
+
     if fmt in ("markdown", "both"):
         if output_path and fmt == "markdown":
             md_path = Path(output_path)
         else:
             md_path = memory.session_dir / "report.md"
-        MarkdownExporter().save(md_path, objects, question, session_id)
+        MarkdownExporter().save(
+            md_path, objects, question, session_id, None, hitl_entries
+        )
         console.print(f"[green]✓[/green] Markdown report: {md_path}")
 
     if fmt in ("json", "both"):
@@ -235,7 +298,9 @@ def export(session_id: str, fmt: str, output_path: str | None) -> None:
             json_path = Path(output_path)
         else:
             json_path = memory.session_dir / "report.json"
-        JsonExporter().save(json_path, objects, question, session_id)
+        JsonExporter().save(
+            json_path, objects, question, session_id, None, hitl_entries
+        )
         console.print(f"[green]✓[/green] JSON report: {json_path}")
 
 
@@ -248,14 +313,19 @@ def _export_report(
 ) -> None:
     """Export the research report after a run."""
     cost = llm.usage.summary()
+    hitl_entries = memory.get_hitl_entries()
 
     if export_format in ("markdown", "both"):
         md_path = memory.session_dir / "report.md"
-        MarkdownExporter().save(md_path, objects, config.question, memory.session_id, cost)
+        MarkdownExporter().save(
+            md_path, objects, config.question, memory.session_id, cost, hitl_entries
+        )
 
     if export_format in ("json", "both"):
         json_path = memory.session_dir / "report.json"
-        JsonExporter().save(json_path, objects, config.question, memory.session_id, cost)
+        JsonExporter().save(
+            json_path, objects, config.question, memory.session_id, cost, hitl_entries
+        )
 
 
 if __name__ == "__main__":
