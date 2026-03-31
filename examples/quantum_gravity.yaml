@@ -1,0 +1,29 @@
+# ORE Example: Quantum Gravity
+# Tackle the deepest open question in physics.
+
+question: >
+  What would a successful resolution of the tension between quantum mechanics
+  and Einstein's general relativity look like? Explore whether spacetime is
+  emergent, whether gravity needs to be quantized, and what experimental
+  signatures might distinguish competing approaches.
+
+max_rounds: 8
+budget_usd: 5.00
+
+agents:
+  builder:
+    model: "anthropic/claude-sonnet-4-20250514"
+    temperature: 0.8
+    max_tokens: 4096
+  skeptic:
+    model: "anthropic/claude-sonnet-4-20250514"
+    temperature: 0.3
+    max_tokens: 4096
+  historian:
+    model: "anthropic/claude-sonnet-4-20250514"
+    temperature: 0.5
+    max_tokens: 3000
+  referee:
+    model: "anthropic/claude-sonnet-4-20250514"
+    temperature: 0.1
+    max_tokens: 2000

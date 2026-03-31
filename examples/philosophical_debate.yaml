@@ -1,0 +1,29 @@
+# ORE Example: Philosophical Debate
+# Apply structured intellectual pressure to a classic philosophical question.
+
+question: >
+  Is consciousness a fundamental feature of the universe (panpsychism) or
+  an emergent property of sufficiently complex information processing
+  (functionalism)? What are the strongest arguments for each position, and
+  is there a synthesis that preserves the best of both?
+
+max_rounds: 10
+budget_usd: 5.00
+
+agents:
+  builder:
+    model: "openai/gpt-4o"
+    temperature: 0.9
+    max_tokens: 4096
+  skeptic:
+    model: "openai/gpt-4o"
+    temperature: 0.3
+    max_tokens: 4096
+  historian:
+    model: "openai/gpt-4o-mini"
+    temperature: 0.5
+    max_tokens: 3000
+  referee:
+    model: "openai/gpt-4o-mini"
+    temperature: 0.1
+    max_tokens: 2000
