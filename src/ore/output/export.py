@@ -1,4 +1,4 @@
-"""Export research sessions to markdown and JSON formats."""
+"""Export research sessions to markdown, JSON, and TL;DR formats."""
 
 from __future__ import annotations
 
@@ -231,6 +231,171 @@ class MarkdownExporter:
     ) -> None:
         md = self.export(objects, question, session_id, cost_summary, hitl_entries)
         path.write_text(md)
+
+
+class TldrExporter:
+    """Produces a shareable one-pager TL;DR from a research session.
+
+    Format:
+    - Question / framing
+    - Ideas explored table (idea | what it gets right | what kills it)
+    - Surviving ideas
+    - Killed ideas
+    - Open questions
+    - One-line strategy summary (final Referee rationale)
+    """
+
+    def export(
+        self,
+        objects: list[ResearchObject],
+        question: str,
+        session_id: str,
+        cost_summary: dict | None = None,
+    ) -> str:
+        lines: list[str] = []
+
+        # ── Header ────────────────────────────────────────────────────────────
+        short_q = question.split("\n")[0].strip()[:200]
+        lines += [
+            f"# TL;DR — {short_q}",
+            "",
+            f"*Session `{session_id}` · "
+            f"{datetime.now(timezone.utc).strftime('%B %Y')}*",
+            "",
+            "---",
+            "",
+        ]
+
+        # ── Ideas explored table ──────────────────────────────────────────────
+        # Pair each main proposition (Conjecture / ToyModel / Reframe) with
+        # the highest-severity Objection that targets it (if any).
+
+        props: list[Conjecture | ToyModel | Reframe] = [
+            o for o in objects
+            if isinstance(o, (Conjecture, ToyModel, Reframe))
+        ]
+        objections: list[Objection] = [
+            o for o in objects if isinstance(o, Objection)
+        ]
+
+        # Index objections by target_id → keep worst severity
+        sev_rank = {"fatal": 3, "major": 2, "minor": 1}
+        obj_by_target: dict[str, Objection] = {}
+        for obj in objections:
+            existing = obj_by_target.get(obj.target_id)
+            if existing is None or sev_rank.get(obj.severity, 0) > sev_rank.get(existing.severity, 0):
+                obj_by_target[obj.target_id] = obj
+
+        if props:
+            lines += [
+                "## Ideas explored",
+                "",
+                "| Idea | What it gets right | What kills it |",
+                "|---|---|---|",
+            ]
+            for prop in props:
+                # Label
+                if isinstance(prop, Conjecture):
+                    label = prop.claim[:80] + ("…" if len(prop.claim) > 80 else "")
+                    positive = _first_sentence(prop.reasoning)
+                elif isinstance(prop, ToyModel):
+                    label = prop.description[:80] + ("…" if len(prop.description) > 80 else "")
+                    positive = prop.predictions[0] if prop.predictions else "—"
+                else:  # Reframe
+                    label = prop.new_framing[:80] + ("…" if len(prop.new_framing) > 80 else "")
+                    positive = _first_sentence(prop.justification)
+
+                # Find objection
+                killer = obj_by_target.get(prop.id)
+                if killer:
+                    icon = {"fatal": "💀", "major": "🔴", "minor": "⚠️"}.get(killer.severity, "")
+                    neg = f"{icon} {_first_sentence(killer.critique)}"
+                else:
+                    neg = "—"
+
+                lines.append(
+                    f"| {_escape_table(label)} "
+                    f"| {_escape_table(positive)} "
+                    f"| {_escape_table(neg)} |"
+                )
+            lines.append("")
+
+        # ── Final Synthesis ───────────────────────────────────────────────────
+        syntheses: list[Synthesis] = [o for o in objects if isinstance(o, Synthesis)]
+        if syntheses:
+            last = syntheses[-1]
+
+            if last.surviving_ideas:
+                lines += ["## What survived", ""]
+                for idea in last.surviving_ideas:
+                    lines.append(f"- {idea}")
+                lines.append("")
+
+            if last.killed_ideas:
+                lines += ["## What was killed", ""]
+                for idea in last.killed_ideas:
+                    lines.append(f"- ~~{idea}~~")
+                lines.append("")
+
+            if last.open_questions:
+                lines += ["## Open questions", ""]
+                for q in last.open_questions:
+                    lines.append(f"- {q}")
+                lines.append("")
+
+        # ── One-line summary (final Referee verdict) ──────────────────────────
+        scores: list[RoundScore] = [o for o in objects if isinstance(o, RoundScore)]
+        if scores:
+            final_score = scores[-1]
+            verdict_icon = {"stop": "🔴", "continue": "🟡", "pivot": "🔵"}.get(
+                final_score.verdict, ""
+            )
+            lines += [
+                "---",
+                "",
+                f"**Final verdict**: {verdict_icon} `{final_score.verdict.upper()}` "
+                f"— {final_score.rationale}",
+                "",
+            ]
+
+        # ── Footer ────────────────────────────────────────────────────────────
+        cost_note = ""
+        if cost_summary:
+            cost_note = (
+                f" · ${cost_summary.get('total_cost_usd', 0):.4f} "
+                f"({cost_summary.get('total_tokens', '?')} tokens)"
+            )
+        lines += [
+            f"*Generated by ORE (Oxford Research Engine){cost_note}. "
+            "Quantitative claims flagged for human review before citing.*",
+        ]
+
+        return "\n".join(lines)
+
+    def save(
+        self,
+        path: Path,
+        objects: list[ResearchObject],
+        question: str,
+        session_id: str,
+        cost_summary: dict | None = None,
+    ) -> None:
+        path.write_text(self.export(objects, question, session_id, cost_summary))
+
+
+def _first_sentence(text: str) -> str:
+    """Return the first sentence (up to 120 chars) of a block of text."""
+    text = text.strip().replace("\n", " ")
+    for sep in (". ", "! ", "? "):
+        idx = text.find(sep)
+        if 0 < idx < 120:
+            return text[: idx + 1].strip()
+    return text[:120].strip()
+
+
+def _escape_table(text: str) -> str:
+    """Escape pipe characters for Markdown table cells."""
+    return text.replace("|", "\\|")
 
 
 class JsonExporter:

@@ -17,7 +17,7 @@ from ore.config import EngineConfig
 from ore.engine import ResearchEngine
 from ore.llm.provider import LLMProvider
 from ore.memory.store import JsonMemoryStore
-from ore.output.export import JsonExporter, MarkdownExporter
+from ore.output.export import JsonExporter, MarkdownExporter, TldrExporter
 from ore.output.terminal import TerminalRenderer
 from ore.tools.search import WebSearchTool
 
@@ -48,7 +48,7 @@ def cli(verbose: bool) -> None:
 @click.option(
     "--export-format",
     "-f",
-    type=click.Choice(["markdown", "json", "both"]),
+    type=click.Choice(["markdown", "json", "both", "tldr"]),
     default="markdown",
     help="Export format for the report.",
 )
@@ -264,13 +264,13 @@ def list_sessions() -> None:
     "--format",
     "-f",
     "fmt",
-    type=click.Choice(["markdown", "json", "both"]),
+    type=click.Choice(["markdown", "json", "both", "tldr"]),
     default="markdown",
-    help="Export format.",
+    help="Export format. 'tldr' produces a shareable one-pager summary.",
 )
 @click.option("--output", "-o", "output_path", type=click.Path(), help="Output file path.")
 def export(session_id: str, fmt: str, output_path: str | None) -> None:
-    """Export a research session to markdown or JSON."""
+    """Export a research session to markdown, JSON, or a TL;DR summary."""
     memory = JsonMemoryStore(session_id=session_id)
     if not memory.memory_file.exists():
         console.print(f"[bold red]Error:[/bold red] Session '{session_id}' not found.")
@@ -282,6 +282,15 @@ def export(session_id: str, fmt: str, output_path: str | None) -> None:
     question = meta.get("question", "Unknown")
 
     hitl_entries = memory.get_hitl_entries()
+
+    if fmt == "tldr":
+        if output_path:
+            tldr_path = Path(output_path)
+        else:
+            tldr_path = memory.session_dir / "tldr.md"
+        TldrExporter().save(tldr_path, objects, question, session_id)
+        console.print(f"[green]✓[/green] TL;DR summary: {tldr_path}")
+        return
 
     if fmt in ("markdown", "both"):
         if output_path and fmt == "markdown":
@@ -326,6 +335,10 @@ def _export_report(
         JsonExporter().save(
             json_path, objects, config.question, memory.session_id, cost, hitl_entries
         )
+
+    if export_format == "tldr":
+        tldr_path = memory.session_dir / "tldr.md"
+        TldrExporter().save(tldr_path, objects, config.question, memory.session_id, cost)
 
 
 if __name__ == "__main__":

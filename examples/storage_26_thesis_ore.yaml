@@ -1,0 +1,46 @@
+# Storage '26 — Session 3. Full context including tech stack (MarketMate, POS/Inventory).
+# Prior sessions missed the technology angle entirely. This session must fix that.
+# Run: cd repo && source .venv/bin/activate && ore run --config examples/storage_26_thesis_ore.yaml --delay 12
+
+source_document: "storage_26_thesis.html"
+
+question: |
+  You are a strategic advisor to the bootstrapped founders of Storage (storageplatform.org) — a curated fashion resale community in London with zero external investment.
+
+  READ THE FULL ATTACHED DOCUMENT before forming any view. It contains:
+  - Hard constraints (no capital, must be executable now)
+  - Why the founders reject conclusions from the two prior ORE sessions
+  - Critical new context: Storage has built MarketMate (a live SaaS event management platform) and a POS + Inventory system already deployed in one London store
+  - Four new hypotheses that prior sessions never considered
+  - The pricing problem (Archive Markets currently £8 — prior session recommended £45-65, founders reject this)
+
+  YOUR MANDATE — do not deviate from this:
+
+  1. The prior sessions were blind to Storage's technology stack. Correct this. MarketMate (marketmate.live) is a full-stack event management SaaS with vendor applications, Stripe invoicing, ticket sales, QR check-in, stall maps, branded emails, and Meta CAPI attribution — features that Eventbrite, Typeform, Square, Google Forms, and Shopify do not combine in one product. Stress-test whether this is a real market gap.
+
+  2. The POS + Inventory system is proven (one London store, loves it). Vintage stores won't scale — but brands running circular/resale/deadstock programmes might. Is there a managed-service or licensing angle here that doesn't require building enterprise SaaS?
+
+  3. Attack the pricing problem directly: Archive Markets at £8 cannot simply become £45-65 without a fundamentally different product. Is the answer to charge sellers more instead of buyers? Premium seller tiers? Or a completely different revenue line?
+
+  4. Identify the single intersection of (community + event track record + MarketMate + POS) that nobody else currently occupies. Be specific. Name the gap.
+
+  5. Run deep. Do not converge early. If a round ends with a comfortable answer, the next Builder must attack it and find the weakness. The Referee must NOT call STOP until a truly actionable, capital-light, 90-day-executable strategy has been identified with specific numbers.
+
+  6. End with one concrete move: what does Storage do in the next 90 days, with no external capital, that generates maximum strategic signal?
+
+max_rounds: 8
+budget_usd: 15.0
+
+agents:
+  builder:
+    model: "anthropic/claude-sonnet-4-20250514"
+    temperature: 0.85
+  skeptic:
+    model: "anthropic/claude-sonnet-4-20250514"
+    temperature: 0.25
+  historian:
+    model: "anthropic/claude-sonnet-4-20250514"
+    temperature: 0.5
+  referee:
+    model: "anthropic/claude-sonnet-4-20250514"
+    temperature: 0.1
