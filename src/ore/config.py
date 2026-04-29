@@ -2,10 +2,24 @@
 
 from __future__ import annotations
 
+import html
+import re
 from pathlib import Path
 
 import yaml
 from pydantic import BaseModel, Field
+
+
+def _html_to_plain_text(html_content: str) -> str:
+    """Strip tags and scripts; keep readable paragraph breaks (no external deps)."""
+    text = html_content
+    text = re.sub(r"(?is)<script[^>]*>.*?</script>", "", text)
+    text = re.sub(r"(?is)<style[^>]*>.*?</style>", "", text)
+    text = re.sub(r"(?i)<br\s*/?>", "\n", text)
+    text = re.sub(r"(?i)</p>", "\n\n", text)
+    text = re.sub(r"<[^>]+>", "", text)
+    text = html.unescape(text)
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
 class AgentConfig(BaseModel):
@@ -36,8 +50,11 @@ class EngineConfig(BaseModel):
     @classmethod
     def from_yaml(cls, path: str | Path) -> EngineConfig:
         """Load configuration from a YAML file."""
-        with open(path) as f:
+        yaml_path = Path(path).resolve()
+        with open(yaml_path) as f:
             raw = yaml.safe_load(f)
+
+        source_document = raw.pop("source_document", None)
 
         agents_raw = raw.pop("agents", {})
         agents = {name: AgentConfig(**cfg) for name, cfg in agents_raw.items()}
@@ -45,6 +62,25 @@ class EngineConfig(BaseModel):
         config = cls(**raw)
         if agents:
             config.agents.update(agents)
+
+        if source_document:
+            doc_path = Path(source_document).expanduser()
+            if not doc_path.is_absolute():
+                doc_path = yaml_path.parent / doc_path
+            doc_path = doc_path.resolve()
+            if doc_path.is_file():
+                raw_html = doc_path.read_text(encoding="utf-8")
+                plain = _html_to_plain_text(raw_html)
+                sep = (
+                    f"\n\n--- Source document ({doc_path}) — plain text ---\n\n"
+                )
+                base = (config.question or "").strip()
+                config.question = base + sep + plain
+            else:
+                config.question = (config.question or "").strip() + (
+                    f"\n\n[ORE config error: source_document not found: {doc_path}]"
+                )
+
         return config
 
     def to_yaml(self, path: str | Path) -> None:

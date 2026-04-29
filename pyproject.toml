@@ -1,6 +1,6 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "ore-research"
@@ -16,7 +16,6 @@ keywords = ["llm", "research", "agents", "multi-agent", "ai"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -29,6 +28,7 @@ dependencies = [
     "click>=8.0.0",
     "rich>=13.0.0",
     "pyyaml>=6.0",
+    "python-dotenv>=1.0.0",
 ]
 
 [project.optional-dependencies]
@@ -48,8 +48,8 @@ ore = "ore.cli:cli"
 Homepage = "https://github.com/christianalteri/oxford-research-engine"
 Repository = "https://github.com/christianalteri/oxford-research-engine"
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/ore"]
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.ruff]
 target-version = "py311"

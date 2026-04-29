@@ -1,0 +1,40 @@
+# ORE prompt: critical analysis of the adapted Pitt speech (modern_slavery_speech.html)
+# Run: source .venv/bin/activate && ore run --config examples/mass_incarceration_speech_review.yaml --delay 12
+#
+# source_document: optional path to HTML (or any text). ORE reads the file at startup and appends
+# plain text to the question — models cannot open file:// links. Use an absolute path or a path
+# relative to this YAML file.
+
+source_document: "/Users/christian/Downloads/modern_slavery_speech.html"
+
+question: |
+  Critically analyze the following proposition and rhetorical project (adapted from William Pitt the Younger's 1792 abolition-of-the-slave-trade speech, recast for the U.S. carceral system).
+
+  Core claims in the text:
+  - Mass incarceration is an "incurable injustice" and must be ended immediately, not gradually — mirroring Pitt's urgency on the slave trade.
+  - The U.S. operates a machinery that punishes poverty (petty offences, pretrial detention for inability to pay bail, licence/fine spirals, drug offences that are legal in some states).
+  - The text explicitly draws a parallel: courts and statutes versus ships and shackles — "the misery" is argued to be comparable; the footer frames mass incarceration as what "many scholars and advocates have called modern slavery."
+  - Statistical and sociological assertions appear (e.g. federal drug custody share, jail pretrial majority, racial disproportion, generational cycles).
+
+  Your task: break this apart as a research debate.
+  - Map the central analogy (transatlantic slave trade / chattel slavery → mass incarceration): where is it illuminating, where is it strained or contested?
+  - Separate moral/rhetorical force from empirical and policy claims: which assertions are well-supported in criminology and law, which are simplified or disputable?
+  - Address counterarguments fairly: public safety, proportionality, political feasibility of "immediate" abolition vs decarceration/reform paths, and definitional debates around "modern slavery."
+  - Conclude with a concise verdict: is this framing strategically and intellectually sound for advocacy, and what would strengthen or weaken it?
+
+max_rounds: 5
+budget_usd: 10.0
+
+agents:
+  builder:
+    model: "anthropic/claude-sonnet-4-20250514"
+    temperature: 0.8
+  skeptic:
+    model: "anthropic/claude-sonnet-4-20250514"
+    temperature: 0.3
+  historian:
+    model: "anthropic/claude-sonnet-4-20250514"
+    temperature: 0.5
+  referee:
+    model: "anthropic/claude-sonnet-4-20250514"
+    temperature: 0.1
